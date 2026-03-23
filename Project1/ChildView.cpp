@@ -7,6 +7,7 @@
 #include "Project1.h"
 #include "ChildView.h"
 #include "graphics/OpenGLRenderer.h"
+#include "graphics/GrTexture.h"
 #include "CMyRaytraceRenderer.h"
 
 #ifdef _DEBUG

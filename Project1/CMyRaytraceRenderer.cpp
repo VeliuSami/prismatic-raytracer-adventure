@@ -1,6 +1,6 @@
 #include "pch.h"
 #include "CMyRaytraceRenderer.h"
-#include <algorithm>
+#include "graphics/GrTexture.h"
 #include <cmath>
 
 void CMyRaytraceRenderer::SetWindow(CWnd* p_window)
@@ -272,7 +272,12 @@ CGrPoint CMyRaytraceRenderer::TraceRay(const CRay& ray, const CRayIntersection::
 		double ndoth = Dot3(N, H);
 		if (ndoth > 0.0)
 		{
-			double spow = pow(ndoth, std::max(1.0f, material->Shininess()));
+			double shininess = material->Shininess();
+			if (shininess < 1.0)
+			{
+				shininess = 1.0;
+			}
+			double spow = pow(ndoth, shininess);
 			color.X() += material->Specular(0) * light.m_specular[0] * spow;
 			color.Y() += material->Specular(1) * light.m_specular[1] * spow;
 			color.Z() += material->Specular(2) * light.m_specular[2] * spow;
@@ -280,8 +285,15 @@ CGrPoint CMyRaytraceRenderer::TraceRay(const CRay& ray, const CRayIntersection::
 	}
 
 	// add reflective bounce
-	double reflect = std::max(material->SpecularOther(0),
-		std::max(material->SpecularOther(1), material->SpecularOther(2)));
+	double reflect = material->SpecularOther(0);
+	if (material->SpecularOther(1) > reflect)
+	{
+		reflect = material->SpecularOther(1);
+	}
+	if (material->SpecularOther(2) > reflect)
+	{
+		reflect = material->SpecularOther(2);
+	}
 	reflect = ClampUnit(reflect);
 
 	if (reflect > 0.001 && depth < maxdepth)

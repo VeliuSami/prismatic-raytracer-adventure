@@ -26,23 +26,81 @@ CChildView::CChildView()
 	CGrPtr<CGrComposite> scene = new CGrComposite;
 	m_scene = scene;
 
-	// A red box
+	CGrPtr<CGrTexture> checker = new CGrTexture;
+	checker->SetSize(256, 256);
+	for (int y = 0; y < checker->Height(); y++)
+	{
+		for (int x = 0; x < checker->Width(); x++)
+		{
+			int tilex = x / 32;
+			int tiley = y / 32;
+			bool dark = ((tilex + tiley) % 2) == 0;
+			if (dark)
+			{
+				checker->Set(x, y, 60, 60, 65);
+			}
+			else
+			{
+				checker->Set(x, y, 190, 190, 195);
+			}
+		}
+	}
+
+	CGrPtr<CGrMaterial> floorpaint = new CGrMaterial;
+	floorpaint->AmbientAndDiffuse(1.0f, 1.0f, 1.0f);
+	floorpaint->Specular(0.15f, 0.15f, 0.15f);
+	floorpaint->Shininess(20.0f);
+	scene->Child(floorpaint);
+
+	CGrPtr<CGrComposite> floorgeo = new CGrComposite;
+	floorpaint->Child(floorgeo);
+
+	CGrPtr<CGrPolygon> floorpoly = new CGrPolygon;
+	floorpoly->Texture(checker);
+	floorpoly->AddNormal3d(0, 1, 0);
+	floorpoly->AddTexVertex3d(-25, -8, -25, 0, 0);
+	floorpoly->AddTexVertex3d(25, -8, -25, 5, 0);
+	floorpoly->AddTexVertex3d(25, -8, 25, 5, 5);
+	floorpoly->AddTexVertex3d(-25, -8, 25, 0, 5);
+	floorgeo->Child(floorpoly);
+
+	CGrPtr<CGrMaterial> mirrorpaint = new CGrMaterial;
+	mirrorpaint->AmbientAndDiffuse(0.22f, 0.24f, 0.30f);
+	mirrorpaint->Specular(0.9f, 0.9f, 0.95f);
+	mirrorpaint->SpecularOther(0.55f, 0.55f, 0.55f);
+	mirrorpaint->Shininess(80.0f);
+	scene->Child(mirrorpaint);
+
+	CGrPtr<CGrComposite> mirrorbox = new CGrComposite;
+	mirrorpaint->Child(mirrorbox);
+	mirrorbox->Box(-15, -8, -6, 7, 8, 7);
+
+	CGrPtr<CGrMaterial> brasspaint = new CGrMaterial;
+	brasspaint->AmbientAndDiffuse(0.76f, 0.66f, 0.22f);
+	brasspaint->Specular(0.8f, 0.7f, 0.35f);
+	brasspaint->Shininess(48.0f);
+	scene->Child(brasspaint);
+
+	CGrPtr<CGrComposite> tetra = new CGrComposite;
+	brasspaint->Child(tetra);
+	CGrPoint p0(0, 6, 0);
+	CGrPoint p1(-5, -3, 5);
+	CGrPoint p2(5, -3, 5);
+	CGrPoint p3(0, -3, -6);
+	tetra->Poly3(p0, p1, p2);
+	tetra->Poly3(p0, p2, p3);
+	tetra->Poly3(p0, p3, p1);
+	tetra->Poly3(p1, p3, p2);
+
 	CGrPtr<CGrMaterial> redpaint = new CGrMaterial;
-	redpaint->AmbientAndDiffuse(0.8f, 0.0f, 0.0f);
+	redpaint->AmbientAndDiffuse(0.80f, 0.14f, 0.12f);
+	redpaint->Specular(0.45f, 0.35f, 0.35f);
+	redpaint->Shininess(30.0f);
 	scene->Child(redpaint);
 
 	CGrPtr<CGrComposite> redbox = new CGrComposite;
 	redpaint->Child(redbox);
-	redbox->Box(1, 1, 1, 5, 5, 5);
-
-	// A white box
-	CGrPtr<CGrMaterial> whitepaint = new CGrMaterial;
-	whitepaint->AmbientAndDiffuse(0.8f, 0.8f, 0.8f);
-	scene->Child(whitepaint);
-
-	CGrPtr<CGrComposite> whitebox = new CGrComposite;
-	whitepaint->Child(whitebox);
-	whitebox->Box(-10, -10, -10, 5, 5, 5);
+	redbox->Box(5, -8, -2, 6, 6, 6);
 }
 
 CChildView::~CChildView()
@@ -192,9 +250,12 @@ void CChildView::ConfigureRenderer(CGrRenderer* p_renderer)
 	float dimd = 0.5f;
 	GLfloat dim[] = { dimd, dimd, dimd, 1.0f };
 	GLfloat brightwhite[] = { 1.f, 1.f, 1.f, 1.0f };
+	GLfloat cool[] = { 0.6f, 0.7f, 1.0f, 1.0f };
 
 	p_renderer->AddLight(CGrPoint(1, 0.5, 1.2, 0),
 		dim, brightwhite, brightwhite);
+	p_renderer->AddLight(CGrPoint(-1.4, 1.0, -0.6, 0),
+		dim, cool, cool);
 }
 
 

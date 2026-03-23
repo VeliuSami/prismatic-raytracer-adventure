@@ -1,5 +1,7 @@
 #include "pch.h"
 #include "CMyRaytraceRenderer.h"
+#include <algorithm>
+#include <cmath>
 
 void CMyRaytraceRenderer::SetWindow(CWnd* p_window)
 {
@@ -54,6 +56,11 @@ void CMyRaytraceRenderer::RendererTranslate(double x, double y, double z)
 	CGrTransform r;
 	r.SetTranslate(x, y, z);
 	m_mstack.back() *= r;
+}
+
+void CMyRaytraceRenderer::RendererTransform(const CGrTransform* p_transform)
+{
+	m_mstack.back() *= *p_transform;
 }
 
 //
@@ -114,45 +121,25 @@ bool CMyRaytraceRenderer::RendererEnd()
 	{
 		for (int c = 0; c < m_rayimagewidth; c++)
 		{
-			double colorTotal[3] = { 0, 0, 0 };
+			CGrPoint color(0, 0, 0, 1);
 
-			double x = xmin + (c + 0.5) / m_rayimagewidth * xwid;
-			double y = ymin + (r + 0.5) / m_rayimageheight * yhit;
-
-
-			// Construct a Ray
-			CRay ray(CGrPoint(0, 0, 0), Normalize3(CGrPoint(x, y, -1, 0)));
-
-			double t;                                   // Will be distance to intersection
-			CGrPoint intersect;                         // Will by x,y,z location of intersection
-			const CRayIntersection::Object* nearest;    // Pointer to intersecting object
-			if (m_intersection.Intersect(ray, 1e20, NULL, nearest, t, intersect))
+			// do small antialiasing samples per pixel
+			const double offsets[2] = { 0.25, 0.75 };
+			for (int sy = 0; sy < 2; sy++)
 			{
-				// We hit something...
-				// Determine information about the intersection
-				CGrPoint N;
-				CGrMaterial* material;
-				CGrTexture* texture;
-				CGrPoint texcoord;
-
-				m_intersection.IntersectInfo(ray, nearest, t,
-					N, material, texture, texcoord);
-
-				if (material != NULL)
+				for (int sx = 0; sx < 2; sx++)
 				{
-					m_rayimage[r][c * 3] = BYTE(material->Diffuse(0) * 255);
-					m_rayimage[r][c * 3 + 1] = BYTE(material->Diffuse(1) * 255);
-					m_rayimage[r][c * 3 + 2] = BYTE(material->Diffuse(2) * 255);
+					double x = xmin + (c + offsets[sx]) / m_rayimagewidth * xwid;
+					double y = ymin + (r + offsets[sy]) / m_rayimageheight * yhit;
+					CRay ray(CGrPoint(0, 0, 0), Normalize3(CGrPoint(x, y, -1, 0)));
+					color += TraceRay(ray, NULL, 0);
 				}
+			}
+			color = color / 4.0;
 
-			}
-			else
-			{
-				// We hit nothing...
-				m_rayimage[r][c * 3] = 0;
-				m_rayimage[r][c * 3 + 1] = 0;
-				m_rayimage[r][c * 3 + 2] = 0;
-			}
+			m_rayimage[r][c * 3] = BYTE(ClampUnit(color.X()) * 255.0);
+			m_rayimage[r][c * 3 + 1] = BYTE(ClampUnit(color.Y()) * 255.0);
+			m_rayimage[r][c * 3 + 2] = BYTE(ClampUnit(color.Z()) * 255.0);
 		}
 		if ((r % 50) == 0)
 		{
@@ -165,4 +152,155 @@ bool CMyRaytraceRenderer::RendererEnd()
 
 
 	return true;
+}
+
+double CMyRaytraceRenderer::ClampUnit(double v)
+{
+	if (v < 0.0)
+	{
+		return 0.0;
+	}
+	if (v > 1.0)
+	{
+		return 1.0;
+	}
+	return v;
+}
+
+CGrPoint CMyRaytraceRenderer::SampleTextureColor(CGrTexture* texture, const CGrPoint& texcoord, const CGrPoint& fallback)
+{
+	if (texture == NULL || texture->Width() <= 0 || texture->Height() <= 0)
+	{
+		return fallback;
+	}
+
+	double s = texcoord.X() - floor(texcoord.X());
+	double t = texcoord.Y() - floor(texcoord.Y());
+	if (s < 0.0)
+	{
+		s += 1.0;
+	}
+	if (t < 0.0)
+	{
+		t += 1.0;
+	}
+
+	int x = int(s * double(texture->Width() - 1));
+	int y = int(t * double(texture->Height() - 1));
+	const BYTE* row = texture->Row(y);
+	const BYTE* pixel = row + x * 3;
+
+	return CGrPoint(pixel[0] / 255.0, pixel[1] / 255.0, pixel[2] / 255.0, 1);
+}
+
+bool CMyRaytraceRenderer::IsShadowed(const CGrPoint& point, const CGrPoint& normal,
+	const CGrPoint& lightpos, const CRayIntersection::Object* self)
+{
+	CGrPoint tolight = lightpos - point;
+	double maxdist = tolight.Length3();
+	if (maxdist <= 1e-6)
+	{
+		return false;
+	}
+
+	CGrPoint ldir = tolight / maxdist;
+	CGrPoint shadowstart = point + normal * 0.001;
+	CRay shadowray(shadowstart, ldir);
+
+	const CRayIntersection::Object* blocker;
+	double tshadow;
+	CGrPoint hit;
+	return m_intersection.Intersect(shadowray, maxdist - 0.002, self, blocker, tshadow, hit);
+}
+
+CGrPoint CMyRaytraceRenderer::TraceRay(const CRay& ray, const CRayIntersection::Object* ignore, int depth)
+{
+	const int maxdepth = 4;
+	const CGrPoint background(0.02, 0.02, 0.05, 1);
+
+	double t;
+	CGrPoint intersect;
+	const CRayIntersection::Object* nearest;
+	if (!m_intersection.Intersect(ray, 1e20, ignore, nearest, t, intersect))
+	{
+		return background;
+	}
+
+	CGrPoint N;
+	CGrMaterial* material = NULL;
+	CGrTexture* texture = NULL;
+	CGrPoint texcoord;
+	m_intersection.IntersectInfo(ray, nearest, t, N, material, texture, texcoord);
+
+	if (material == NULL)
+	{
+		return CGrPoint(0, 0, 0, 1);
+	}
+
+	N = Normalize3(N);
+	CGrPoint V = Normalize3(-ray.Direction());
+	CGrPoint base(material->Diffuse(0), material->Diffuse(1), material->Diffuse(2), 1);
+	base = SampleTextureColor(texture, texcoord, base);
+
+	CGrPoint color(0, 0, 0, 1);
+
+	// add ambient and direct lights
+	for (int li = 0; li < LightCnt(); li++)
+	{
+		const Light& light = GetLight(li);
+
+		color.X() += base.X() * material->Ambient(0) * light.m_ambient[0];
+		color.Y() += base.Y() * material->Ambient(1) * light.m_ambient[1];
+		color.Z() += base.Z() * material->Ambient(2) * light.m_ambient[2];
+
+		CGrPoint lightpos = light.m_pos;
+		if (IsShadowed(intersect, N, lightpos, nearest))
+		{
+			continue;
+		}
+
+		CGrPoint L = Normalize3(lightpos - intersect);
+		double ndotl = Dot3(N, L);
+		if (ndotl > 0.0)
+		{
+			color.X() += base.X() * material->Diffuse(0) * light.m_diffuse[0] * ndotl;
+			color.Y() += base.Y() * material->Diffuse(1) * light.m_diffuse[1] * ndotl;
+			color.Z() += base.Z() * material->Diffuse(2) * light.m_diffuse[2] * ndotl;
+		}
+
+		CGrPoint H = Normalize3(L + V);
+		double ndoth = Dot3(N, H);
+		if (ndoth > 0.0)
+		{
+			double spow = pow(ndoth, std::max(1.0f, material->Shininess()));
+			color.X() += material->Specular(0) * light.m_specular[0] * spow;
+			color.Y() += material->Specular(1) * light.m_specular[1] * spow;
+			color.Z() += material->Specular(2) * light.m_specular[2] * spow;
+		}
+	}
+
+	// add reflective bounce
+	double reflect = std::max(material->SpecularOther(0),
+		std::max(material->SpecularOther(1), material->SpecularOther(2)));
+	reflect = ClampUnit(reflect);
+
+	if (reflect > 0.001 && depth < maxdepth)
+	{
+		double dndot = Dot3(ray.Direction(), N);
+		CGrPoint rdir = Normalize3(ray.Direction() - N * (2.0 * dndot));
+		CGrPoint rstart = intersect + N * 0.001;
+		CGrPoint reflected = TraceRay(CRay(rstart, rdir), nearest, depth + 1);
+
+		color = color * (1.0 - reflect) + reflected * reflect;
+	}
+
+	// blend in fog by distance
+	const CGrPoint fog(0.10, 0.12, 0.16, 1);
+	double fogamount = ClampUnit((t - 40.0) / 130.0);
+	color = color * (1.0 - fogamount) + fog * fogamount;
+
+	color.X() = ClampUnit(color.X());
+	color.Y() = ClampUnit(color.Y());
+	color.Z() = ClampUnit(color.Z());
+	return color;
 }

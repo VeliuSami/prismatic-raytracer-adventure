@@ -28,7 +28,14 @@ public:
     virtual void RendererPopMatrix();
     virtual void RendererRotate(double a, double x, double y, double z);
     virtual void RendererTranslate(double x, double y, double z);
+    virtual void RendererTransform(const CGrTransform* p_transform);
     void RendererEndPolygon();
 
+private:
+    CGrPoint TraceRay(const CRay& ray, const CRayIntersection::Object* ignore, int depth);
+    bool IsShadowed(const CGrPoint& point, const CGrPoint& normal,
+        const CGrPoint& lightpos, const CRayIntersection::Object* self);
+    CGrPoint SampleTextureColor(CGrTexture* texture, const CGrPoint& texcoord, const CGrPoint& fallback);
+    static double ClampUnit(double v);
 };
 

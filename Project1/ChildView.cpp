@@ -19,7 +19,7 @@
 
 CChildView::CChildView()
 {
-	m_camera.Set(20., 10., 50., 0., 0., 0., 0., 1., 0.);
+	m_camera.Set(16., 7., 30., 0., -3., 0., 0., 1., 0.);
 
 	m_raytrace = false;
 	m_rayimage = NULL;
@@ -66,9 +66,9 @@ CChildView::CChildView()
 	floorgeo->Child(floorpoly);
 
 	CGrPtr<CGrMaterial> mirrorpaint = new CGrMaterial;
-	mirrorpaint->AmbientAndDiffuse(0.22f, 0.24f, 0.30f);
-	mirrorpaint->Specular(0.9f, 0.9f, 0.95f);
-	mirrorpaint->SpecularOther(0.55f, 0.55f, 0.55f);
+	mirrorpaint->AmbientAndDiffuse(0.10f, 0.10f, 0.12f);
+	mirrorpaint->Specular(1.0f, 1.0f, 1.0f);
+	mirrorpaint->SpecularOther(0.80f, 0.80f, 0.80f);
 	mirrorpaint->Shininess(80.0f);
 	scene->Child(mirrorpaint);
 
@@ -248,14 +248,14 @@ void CChildView::ConfigureRenderer(CGrRenderer* p_renderer)
 	// Set the light locations and colors
 	//
 
-	float dimd = 0.5f;
+	float dimd = 0.2f;
 	GLfloat dim[] = { dimd, dimd, dimd, 1.0f };
-	GLfloat brightwhite[] = { 1.f, 1.f, 1.f, 1.0f };
-	GLfloat cool[] = { 0.6f, 0.7f, 1.0f, 1.0f };
+	GLfloat brightwhite[] = { 1.2f, 1.2f, 1.2f, 1.0f };
+	GLfloat cool[] = { 0.35f, 0.45f, 0.9f, 1.0f };
 
-	p_renderer->AddLight(CGrPoint(1, 0.5, 1.2, 0),
+	p_renderer->AddLight(CGrPoint(6.0, 10.0, 3.5, 1.0),
 		dim, brightwhite, brightwhite);
-	p_renderer->AddLight(CGrPoint(-1.4, 1.0, -0.6, 0),
+	p_renderer->AddLight(CGrPoint(-10.0, 7.0, -8.0, 1.0),
 		dim, cool, cool);
 }
 

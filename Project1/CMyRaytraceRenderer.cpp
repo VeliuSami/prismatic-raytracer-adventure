@@ -307,8 +307,8 @@ CGrPoint CMyRaytraceRenderer::TraceRay(const CRay& ray, const CRayIntersection::
 	}
 
 	// blend in fog by distance
-	const CGrPoint fog(0.10, 0.12, 0.16, 1);
-	double fogamount = ClampUnit((t - 40.0) / 130.0);
+	const CGrPoint fog(0.18, 0.20, 0.25, 1);
+	double fogamount = ClampUnit((t - 14.0) / 34.0);
 	color = color * (1.0 - fogamount) + fog * fogamount;
 
 	color.X() = ClampUnit(color.X());

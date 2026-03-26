@@ -74,6 +74,12 @@ bool COpenGLRenderer::RendererStart()
    glCullFace(GL_BACK);
    glEnable(GL_CULL_FACE);
 
+   // Keep lit textured surfaces visible even when lights are soft
+   GLfloat model_ambient[] = { 0.32f, 0.32f, 0.34f, 1.0f };
+   glLightModelfv(GL_LIGHT_MODEL_AMBIENT, model_ambient);
+   glLightModeli(GL_LIGHT_MODEL_LOCAL_VIEWER, GL_TRUE);
+   glEnable(GL_NORMALIZE);
+
    // Set the camera location
    glMatrixMode(GL_MODELVIEW);
 

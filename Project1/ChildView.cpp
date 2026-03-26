@@ -58,11 +58,12 @@ CChildView::CChildView()
 
 	CGrPtr<CGrPolygon> floorpoly = new CGrPolygon;
 	floorpoly->Texture(checker);
+	// wind CCW as seen from above so the top face is not back face culled in OpenGL
 	floorpoly->AddNormal3d(0, 1, 0);
 	floorpoly->AddTexVertex3d(-25, -8, -25, 0, 0);
-	floorpoly->AddTexVertex3d(25, -8, -25, 5, 0);
-	floorpoly->AddTexVertex3d(25, -8, 25, 5, 5);
 	floorpoly->AddTexVertex3d(-25, -8, 25, 0, 5);
+	floorpoly->AddTexVertex3d(25, -8, 25, 5, 5);
+	floorpoly->AddTexVertex3d(25, -8, -25, 5, 0);
 	floorgeo->Child(floorpoly);
 
 	CGrPtr<CGrMaterial> mirrorpaint = new CGrMaterial;

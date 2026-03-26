@@ -8,7 +8,9 @@
 #include "ChildView.h"
 #include "graphics/OpenGLRenderer.h"
 #include "graphics/GrTexture.h"
+#include "graphics/GrTransform.h"
 #include "CMyRaytraceRenderer.h"
+#include <cmath>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -88,6 +90,63 @@ CChildView::CChildView()
 	tetra->Poly3(p0, p2, p3);
 	tetra->Poly3(p0, p3, p1);
 	tetra->Poly3(p1, p3, p2);
+
+	// square base pyramid (not the same thing as the tetrahedron)
+	CGrPtr<CGrMaterial> pyrpaint = new CGrMaterial;
+	pyrpaint->AmbientAndDiffuse(0.22f, 0.52f, 0.72f, 1.0f);
+	pyrpaint->Specular(0.35f, 0.45f, 0.55f, 1.0f);
+	pyrpaint->Shininess(28.0f);
+	scene->Child(pyrpaint);
+	CGrPtr<CGrComposite> pyr = new CGrComposite;
+	pyrpaint->Child(pyr);
+	CGrPoint pa(-12.0, 5.0, -12.0);
+	CGrPoint pb0(-16.0, -8.0, -16.0);
+	CGrPoint pb1(-8.0, -8.0, -16.0);
+	CGrPoint pb2(-8.0, -8.0, -8.0);
+	CGrPoint pb3(-16.0, -8.0, -8.0);
+	pyr->Poly4(pb0, pb1, pb2, pb3);
+	pyr->Poly3(pa, pb0, pb1);
+	pyr->Poly3(pa, pb1, pb2);
+	pyr->Poly3(pa, pb2, pb3);
+	pyr->Poly3(pa, pb3, pb0);
+
+	// 8 sided cylinder-ish solid so it is not another box
+	CGrPtr<CGrMaterial> cylpaint = new CGrMaterial;
+	cylpaint->AmbientAndDiffuse(0.32f, 0.62f, 0.28f, 1.0f);
+	cylpaint->Specular(0.4f, 0.55f, 0.35f, 1.0f);
+	cylpaint->Shininess(26.0f);
+	scene->Child(cylpaint);
+	CGrPtr<CGrComposite> cylgrp = new CGrComposite;
+	cylpaint->Child(cylgrp);
+	const double cx = 14.0;
+	const double cz = 10.0;
+	const double rad = 2.2;
+	const double y0 = -8.0;
+	const double y1 = 2.0;
+	CGrPoint ringb[8];
+	CGrPoint ringt[8];
+	for (int i = 0; i < 8; i++)
+	{
+		double a = i * (GR_PI / 4.0);
+		double dx = cos(a) * rad;
+		double dz = sin(a) * rad;
+		ringb[i] = CGrPoint(cx + dx, y0, cz + dz);
+		ringt[i] = CGrPoint(cx + dx, y1, cz + dz);
+	}
+	for (int i = 0; i < 8; i++)
+	{
+		int j = (i + 1) % 8;
+		cylgrp->Poly3(ringb[i], ringb[j], ringt[j]);
+		cylgrp->Poly3(ringb[i], ringt[j], ringt[i]);
+	}
+	CGrPoint midb(cx, y0, cz);
+	CGrPoint midt(cx, y1, cz);
+	for (int i = 0; i < 8; i++)
+	{
+		int j = (i + 1) % 8;
+		cylgrp->Poly3(midb, ringb[j], ringb[i]);
+		cylgrp->Poly3(midt, ringt[i], ringt[j]);
+	}
 
 	CGrPtr<CGrMaterial> redpaint = new CGrMaterial;
 	redpaint->AmbientAndDiffuse(0.80f, 0.14f, 0.12f);

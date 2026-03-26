@@ -117,20 +117,21 @@ bool CMyRaytraceRenderer::RendererEnd()
 	double xmin = ymin * ProjectionAspect();
 	double xwid = -xmin * 2;
 
+	const double jx[2] = { 0.25, 0.75 };
+	const double jy[2] = { 0.25, 0.75 };
+
 	for (int r = 0; r < m_rayimageheight; r++)
 	{
 		for (int c = 0; c < m_rayimagewidth; c++)
 		{
 			CGrPoint color(0, 0, 0, 1);
-
-			// do small antialiasing samples per pixel
-			const double offsets[2] = { 0.25, 0.75 };
+			// 2x2 subsamples for AA
 			for (int sy = 0; sy < 2; sy++)
 			{
 				for (int sx = 0; sx < 2; sx++)
 				{
-					double x = xmin + (c + offsets[sx]) / m_rayimagewidth * xwid;
-					double y = ymin + (r + offsets[sy]) / m_rayimageheight * yhit;
+					double x = xmin + (c + jx[sx]) / m_rayimagewidth * xwid;
+					double y = ymin + (r + jy[sy]) / m_rayimageheight * yhit;
 					CRay ray(CGrPoint(0, 0, 0), Normalize3(CGrPoint(x, y, -1, 0)));
 					color += TraceRay(ray, NULL, 0);
 				}
@@ -156,34 +157,20 @@ bool CMyRaytraceRenderer::RendererEnd()
 
 double CMyRaytraceRenderer::ClampUnit(double v)
 {
-	if (v < 0.0)
-	{
-		return 0.0;
-	}
-	if (v > 1.0)
-	{
-		return 1.0;
-	}
+	if (v < 0.0) return 0.0;
+	if (v > 1.0) return 1.0;
 	return v;
 }
 
 CGrPoint CMyRaytraceRenderer::SampleTextureColor(CGrTexture* texture, const CGrPoint& texcoord, const CGrPoint& fallback)
 {
 	if (texture == NULL || texture->Width() <= 0 || texture->Height() <= 0)
-	{
 		return fallback;
-	}
 
 	double s = texcoord.X() - floor(texcoord.X());
 	double t = texcoord.Y() - floor(texcoord.Y());
-	if (s < 0.0)
-	{
-		s += 1.0;
-	}
-	if (t < 0.0)
-	{
-		t += 1.0;
-	}
+	if (s < 0.0) s += 1.0;
+	if (t < 0.0) t += 1.0;
 
 	int x = int(s * double(texture->Width() - 1));
 	int y = int(t * double(texture->Height() - 1));
@@ -198,10 +185,7 @@ bool CMyRaytraceRenderer::IsShadowed(const CGrPoint& point, const CGrPoint& norm
 {
 	CGrPoint tolight = lightpos - point;
 	double maxdist = tolight.Length3();
-	if (maxdist <= 1e-6)
-	{
-		return false;
-	}
+	if (maxdist <= 1e-6) return false;
 
 	CGrPoint ldir = tolight / maxdist;
 	CGrPoint shadowstart = point + normal * 0.001;
@@ -222,9 +206,7 @@ CGrPoint CMyRaytraceRenderer::TraceRay(const CRay& ray, const CRayIntersection::
 	CGrPoint intersect;
 	const CRayIntersection::Object* nearest;
 	if (!m_intersection.Intersect(ray, 1e20, ignore, nearest, t, intersect))
-	{
 		return background;
-	}
 
 	CGrPoint N;
 	CGrMaterial* material = NULL;
@@ -233,9 +215,7 @@ CGrPoint CMyRaytraceRenderer::TraceRay(const CRay& ray, const CRayIntersection::
 	m_intersection.IntersectInfo(ray, nearest, t, N, material, texture, texcoord);
 
 	if (material == NULL)
-	{
 		return CGrPoint(0, 0, 0, 1);
-	}
 
 	N = Normalize3(N);
 	CGrPoint V = Normalize3(-ray.Direction());
@@ -244,72 +224,57 @@ CGrPoint CMyRaytraceRenderer::TraceRay(const CRay& ray, const CRayIntersection::
 
 	CGrPoint color(0, 0, 0, 1);
 
-	// add ambient and direct lights
-	for (int li = 0; li < LightCnt(); li++)
+	int nlights = LightCnt();
+	for (int k = 0; k < nlights; k++)
 	{
-		const Light& light = GetLight(li);
+		const Light& Lg = GetLight(k);
 
-		color.X() += base.X() * material->Ambient(0) * light.m_ambient[0];
-		color.Y() += base.Y() * material->Ambient(1) * light.m_ambient[1];
-		color.Z() += base.Z() * material->Ambient(2) * light.m_ambient[2];
+		color.X() += base.X() * material->Ambient(0) * Lg.m_ambient[0];
+		color.Y() += base.Y() * material->Ambient(1) * Lg.m_ambient[1];
+		color.Z() += base.Z() * material->Ambient(2) * Lg.m_ambient[2];
 
-		CGrPoint lightpos = light.m_pos;
-		if (IsShadowed(intersect, N, lightpos, nearest))
-		{
+		if (IsShadowed(intersect, N, Lg.m_pos, nearest))
 			continue;
-		}
 
-		CGrPoint L = Normalize3(lightpos - intersect);
+		CGrPoint L = Normalize3(Lg.m_pos - intersect);
 		double ndotl = Dot3(N, L);
 		if (ndotl > 0.0)
 		{
-			color.X() += base.X() * material->Diffuse(0) * light.m_diffuse[0] * ndotl;
-			color.Y() += base.Y() * material->Diffuse(1) * light.m_diffuse[1] * ndotl;
-			color.Z() += base.Z() * material->Diffuse(2) * light.m_diffuse[2] * ndotl;
+			color.X() += base.X() * material->Diffuse(0) * Lg.m_diffuse[0] * ndotl;
+			color.Y() += base.Y() * material->Diffuse(1) * Lg.m_diffuse[1] * ndotl;
+			color.Z() += base.Z() * material->Diffuse(2) * Lg.m_diffuse[2] * ndotl;
 		}
 
 		CGrPoint H = Normalize3(L + V);
 		double ndoth = Dot3(N, H);
 		if (ndoth > 0.0)
 		{
-			double shininess = material->Shininess();
-			if (shininess < 1.0)
-			{
-				shininess = 1.0;
-			}
-			double spow = pow(ndoth, shininess);
-			color.X() += material->Specular(0) * light.m_specular[0] * spow;
-			color.Y() += material->Specular(1) * light.m_specular[1] * spow;
-			color.Z() += material->Specular(2) * light.m_specular[2] * spow;
+			double sh = material->Shininess();
+			if (sh < 1.0) sh = 1.0;
+			double spec = pow(ndoth, sh);
+			color.X() += material->Specular(0) * Lg.m_specular[0] * spec;
+			color.Y() += material->Specular(1) * Lg.m_specular[1] * spec;
+			color.Z() += material->Specular(2) * Lg.m_specular[2] * spec;
 		}
 	}
 
-	// add reflective bounce
 	double reflect = material->SpecularOther(0);
-	if (material->SpecularOther(1) > reflect)
-	{
-		reflect = material->SpecularOther(1);
-	}
-	if (material->SpecularOther(2) > reflect)
-	{
-		reflect = material->SpecularOther(2);
-	}
+	if (material->SpecularOther(1) > reflect) reflect = material->SpecularOther(1);
+	if (material->SpecularOther(2) > reflect) reflect = material->SpecularOther(2);
 	reflect = ClampUnit(reflect);
 
 	if (reflect > 0.001 && depth < maxdepth)
 	{
-		double dndot = Dot3(ray.Direction(), N);
-		CGrPoint rdir = Normalize3(ray.Direction() - N * (2.0 * dndot));
-		CGrPoint rstart = intersect + N * 0.001;
-		CGrPoint reflected = TraceRay(CRay(rstart, rdir), nearest, depth + 1);
-
-		color = color * (1.0 - reflect) + reflected * reflect;
+		double dn = Dot3(ray.Direction(), N);
+		CGrPoint rdir = Normalize3(ray.Direction() - N * (2.0 * dn));
+		CGrPoint r0 = intersect + N * 0.001;
+		CGrPoint reflcol = TraceRay(CRay(r0, rdir), nearest, depth + 1);
+		color = color * (1.0 - reflect) + reflcol * reflect;
 	}
 
-	// blend in fog by distance
-	const CGrPoint fog(0.18, 0.20, 0.25, 1);
-	double fogamount = ClampUnit((t - 14.0) / 34.0);
-	color = color * (1.0 - fogamount) + fog * fogamount;
+	const CGrPoint fogcol(0.18, 0.20, 0.25, 1);
+	double fogmix = ClampUnit((t - 14.0) / 34.0);
+	color = color * (1.0 - fogmix) + fogcol * fogmix;
 
 	color.X() = ClampUnit(color.X());
 	color.Y() = ClampUnit(color.Y());

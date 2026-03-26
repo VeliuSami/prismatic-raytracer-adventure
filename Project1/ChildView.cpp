@@ -33,17 +33,12 @@ CChildView::CChildView()
 	{
 		for (int x = 0; x < checker->Width(); x++)
 		{
-			int tilex = x / 32;
-			int tiley = y / 32;
-			bool dark = ((tilex + tiley) % 2) == 0;
-			if (dark)
-			{
+			int tx = x / 32;
+			int ty = y / 32;
+			if (((tx + ty) & 1) == 0)
 				checker->Set(x, y, 60, 60, 65);
-			}
 			else
-			{
 				checker->Set(x, y, 190, 190, 195);
-			}
 		}
 	}
 
@@ -58,7 +53,7 @@ CChildView::CChildView()
 
 	CGrPtr<CGrPolygon> floorpoly = new CGrPolygon;
 	floorpoly->Texture(checker);
-	// wind CCW as seen from above so the top face is not back face culled in OpenGL
+	// verts ordered CCW from +Y so GL keeps the top face
 	floorpoly->AddNormal3d(0, 1, 0);
 	floorpoly->AddTexVertex3d(-25, -8, -25, 0, 0);
 	floorpoly->AddTexVertex3d(-25, -8, 25, 0, 5);

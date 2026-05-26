@@ -4,7 +4,7 @@ A recursive raytracer built on top of a provided OpenGL/MFC graphics framework, 
 
 ## Authors
 
-- **Adil Mallick**
+- **Sami Veliu**
 
 ## Features
 
